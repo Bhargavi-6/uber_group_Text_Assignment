@@ -1,0 +1,116 @@
+---
+title: "Data_Pre-processing"
+date: '2022-07-29'
+output: html_document
+---
+
+This assignment is submitted by following members:
+    
+    AJITH SANIKOMMU          PGID: 12120006
+    Anjana Rajan	      PGID: 12120080
+    Bhargavi Peddapati	  PGID: 12120067
+    Rohini Singh	      PGID: 12120059
+    Shantanu Srivastava	  PGID: 12120061
+
+#Code in this file perform data pre-processing 
+1. removal of speacial characters (! and ?), non-ASCII characters, whitespaces
+2. Conversion to lowercase
+3. non-English to English translation
+4. Removal of redundant/less useful columns such as Application version. itunes URL, etc
+4. Splitting of 'date'column into 'Day', 'Month', 'Year' and 'Time'
+
+
+```{r}
+#Installing required packages and invoking required libraries
+#install.packages("textcat")
+require("textcat")
+#install.packages("aws.translate", repos = c(getOption("repos"), "http://cloudyr.github.io/drat"))
+require("aws.translate")
+#install.packages("stringr", dependencies = TRUE)
+require("stringr")
+#install.packages("dplyr")
+require("dplyr")
+#install.packages("tidyverse")
+#install.packages("tidytext")
+require("tidyverse")
+require("tidytext")
+
+
+#reading dataset 
+uber_data <- read.csv("/Users/anjana/Desktop/AMPBA/Term2/TA/Group-Assignment/uber_reviews_itune.csv",header=TRUE)
+#View(uber_data)
+
+#Removing irrelevant column
+final_uber_data  <- uber_data[,c(2,5:7)]
+#View(final_uber_data)
+
+#text cleaning and pre-processing
+record_count <- nrow(final_uber_data)
+
+#Remove latin code, UTF8 code, etc
+clean_string <- function(x){
+  #cleaned <- vector(mode = "list", length = 490)
+  #remove non-ASCII characters
+  step1 <- gsub("[\x80-\xff]", "", x)
+  #remove Unicode characters
+  step2 <- gsub("<U\\+\\w+>", "", step1)
+  step4 <- str_replace_all(step2, "!?", "") 
+  step5 <- tolower(enc2utf8(step4))	  
+  # collapse one or more spaces into one space using `+` regex or for repeats >1
+  final_text <- stringr::str_replace_all(step5,"[\\s]+", " ") 
+  
+  return(final_text)
+}
+
+
+final_uber_data$Review <- sapply(final_uber_data$Review,clean_string)
+final_uber_data$Title <- sapply(final_uber_data$Title,clean_string)
+#View(final_uber_data)
+
+final_uber_data['language'] <- NA
+for(i in 1:record_count){
+  final_uber_data$language[i] <- textcat(final_uber_data$Review[i])
+  if (is.na(final_uber_data$language[i])) {
+    final_uber_data$Review[i] <- NA
+    final_uber_data$language[i] <- "none"
+  }
+}
+
+# Translate non-English text to English using AWS Translate API
+# Read CSV file with AWS access key id and AWS secret access key:
+keyTable <- read.csv("/Users/anjana/Desktop/AMPBA/Term2/TA/Group-Assignment/credentials.csv", header = T)
+AWS_ACCESS_KEY_ID <- as.character(keyTable$Access.Key.Id)
+AWS_SECRET_ACCESS_KEY <- as.character(keyTable$Secret.Access.Key)
+
+# Activate system environment:
+Sys.setenv("AWS_ACCESS_KEY_ID" = AWS_ACCESS_KEY_ID, "AWS_SECRET_ACCESS_KEY" = AWS_SECRET_ACCESS_KEY, "AWS_DEFAULT_REGION" = "us-west-1")
+
+
+for(i in 1:record_count) {
+  if (final_uber_data$language[i] == "spanish" | final_uber_data$language[i] == "portuguese") {
+    final_uber_data$Review[i] <- translate(final_uber_data$Review[i], from = "es", to = "en")[1]
+    final_uber_data$language[i] <- textcat(final_uber_data$Review[i])
+  }
+}
+#View(final_uber_data)
+
+
+modified_uber_data <- subset (final_uber_data, select = -language)
+modified_uber_data <- subset(modified_uber_data, !is.na(final_uber_data$Review))
+
+modified_uber_data$Time <- format(as.POSIXct(modified_uber_data$Date,format="%d-%m-%Y %H:%M"),"%H:%M")
+modified_uber_data$Date <- format(as.POSIXct(modified_uber_data$Date,format="%d-%m-%Y %H:%M"),"%d-%m-%Y")
+#View(modified_uber_data)
+
+my_uber_data <- modified_uber_data
+my_uber_data$Day <- format(as.POSIXct(my_uber_data$Date,format="%d-%m-%Y"),"%d")
+my_uber_data$Month <- format(as.POSIXct(my_uber_data$Date,format="%d-%m-%Y"),"%m")
+my_uber_data$Year <- format(as.POSIXct(my_uber_data$Date,format="%d-%m-%Y"),"%Y")
+my_uber_data <- subset (my_uber_data, select = -Date)
+#View(my_uber_data)
+
+
+#Extracting dataframe
+write.csv(modified_uber_data,file="modified_uber_data.csv")
+write.csv(my_uber_data,file="my_uber_data.csv")
+```

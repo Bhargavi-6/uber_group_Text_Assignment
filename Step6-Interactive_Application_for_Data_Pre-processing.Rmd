@@ -1,0 +1,260 @@
+---
+title: "Data Pre-processing Interactcive Application"
+date: '2022-07-29'
+output: html_document
+---
+
+This assignment is submitted by following members:
+    
+    AJITH SANIKOMMU          PGID: 12120006
+    Anjana Rajan	      PGID: 12120080
+    Bhargavi Peddapati	  PGID: 12120067
+    Rohini Singh	      PGID: 12120059
+    Shantanu Srivastava	  PGID: 12120061
+
+## Structure of a Shiny App
+This Shiny apps is a single script defining  ui and server functions.
+
+#Summary of the the App and its Usage:
+#About the app
+The app is a tool for cleaning dataset. Following can be done using the app:
+1. Upload required data by clicking on 'Browse' button
+2. Provide column IDs what should be included in the pre-processed dataset
+3. choose data clensing options 
+4. Download the cleansed dataset
+
+#Layout of App
+The app has a side panel and a main panel. In the side panel user can upload dataset and choose data cleansing options required.
+Once the options are submitted, the app cleanses the data  and displays the final dataset in the main panel.
+User has an option to download the clensed dataset by clicking on the 'Download' button.
+
+
+![Data_Pre-Processing_App](/Users/anjana/Desktop/Data_Pre-Processing_App.png)
+*NOTE: once the app is lauched, please up the "uber_reviews_itune.csv" provided as initial dataset for this assignment*
+
+```{r, eval=FALSE, echo=TRUE}
+library("shiny")
+
+# Define ui function
+ui <- shinyUI(
+  fluidPage(
+    tags$style(HTML("
+                    .tabbable > .nav > li[class=active]    > a {background-color: #9AB7C0; color:#000000; border-color: #2e6da4;}"
+    )),
+    titlePanel("Data Pre-processing"),
+    sidebarLayout( 
+      sidebarPanel(  
+        fileInput("file1", "Upload data (csv file with header)"),
+        tags$style("
+             .btn-file {  
+             color: #fff;
+             background-color:#337ab7; 
+             border-color: #2e6da4; 
+             }
+            .progress-bar {
+             background-color: green;
+             }
+        "),
+        textInput("n", "Columns Required","all"),
+        tags$hr(style = "border-top: 1px solid #C5C0BF;"),
+        h4("Data Clensing Options:"),
+        radioButtons("special","Remove Special Characters (! and ?), non-ASCII Characters and Whitespaces",choices = c("Yes","No"),selected="No"),
+        radioButtons("english","Translate Non-English Text to English",choices = c("Yes","No"),selected="No"),
+        conditionalPanel(
+          condition="input.special == 'Yes'",
+          radioButtons("lower","Convert to Lower Case",choices = c("Yes","No"),selected="No")
+        ),
+        actionButton("go", "Submit", icon("paper-plane"), 
+                     style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+        width = 3
+      ),
+      mainPanel(
+        tabsetPanel(id="tabs",
+                    tabPanel("Overview",
+                             h4(p("Data Input")),
+                             p("This app supports only comma separated values (.csv) data file. CSV data file should have headers and the first column of the file should have row names.",align="justify"),
+                             br(),
+                             h4('How to use this App'),
+                             p("", class = "my-class"),
+                             tags$ul(
+                               tags$li('Click on', span(strong("Upload data (csv file with header)"),'button and choose a .csv file.'), 
+                                       p('Once the file is uploaded, summary of all the columns in the dataset will be displayed in', span(strong("Summary")), 'tab'), 
+                                       tags$li('Provide the column IDs of interest in', span(strong("Columns Required")), 'text box.'), 
+                                       p('Example,'),
+                                       tags$ul(
+                                         tags$li('If you want to select columns 2,5,6 and 7, enter 2,5:7 or 2,5,6,7'),
+                                         tags$li('If you want to select all columns, leave default value "all" as it is'),
+                                       ),
+                                       br(),
+                                       tags$li('Select data cleansing options made available on the side-panel and click on', span(strong("Submit")),'button.'),
+                                       p('Cleansed dataset will be diplayed on', span(strong("Cleansed Dataset")),'tab'),
+                                       p(span(strong("NOTE:")),'By default all data cleansing options are set to "No" in the side-panel. Please make changes as needed'),
+                                       br(),
+                                       tags$li('Click on', span(strong("Download")),'button to download the cleansed dataset.'),
+                                       
+                               ),
+                             ),
+                             br(),
+                             p(span(strong("NOTE:"))),
+                             tags$ul(
+                               tags$li('Post generating pre-processed dataset, if you wish to start over from the beginning (upload a new file) or change selected columns or change data cleasning options, please make necessary changes in the side panel and click on', span(strong("Submit")),'button. New dataset will be generated based on inputs (file and column IDs) and options selected'),
+                               br(),
+                               tags$li('If data cleasing option',span(strong("Translate Non-English Text to English")),'is selected, generating the required dataset may take a few seconds (based on the data size). Please hang in there and thank you for your patience.'),
+                             ),
+                             tags$hr(style = "border-top: 1px solid #C5C0BF;"),
+                    ),
+                    tabPanel("Summary",
+                             br(),
+                             textOutput("text"),
+                             br(),
+                             verbatimTextOutput("summary"),
+                    ),
+                    tabPanel("Cleansed Dataset",
+                             br(),
+                             fluidRow(
+                               column(2, offset = 0,
+                                      downloadButton("download", style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                               )
+                             ),
+                             br(),
+                             dataTableOutput('clust_data')
+                    )
+        )
+      )# end of main panel
+    ) # end of sidebarLayout
+  )  # end if fluidPage
+)# end of UI
+
+
+
+# Define Server function
+server <- shinyServer(function(input, output, session) {
+  observeEvent(input$file1,{
+    output$summary <- renderPrint({
+      if(!is.null(input$file1)) {
+        output$text <- renderText({paste0("Data Summary") })
+        mydataset <- as.data.frame(read.csv(input$file1$datapath ,header=TRUE))
+        print(summary(mydataset))
+      }
+    })
+    updateTabsetPanel(session, "tabs", selected = "Summary")
+  })
+  
+  observeEvent(input$go,{
+    output$clust_data <- renderDataTable({
+      initial_data <- datasetInput()
+    })
+    updateTabsetPanel(session, "tabs", selected = "Cleansed Dataset")
+  })
+
+#Reactive event - When 'Submit button in clicked, data pre-processing will be executed
+  datasetInput <- eventReactive(input$go,{
+      final_data <- as.data.frame(read.csv(input$file1$datapath ,header=TRUE))
+      #Code to convert data entered in 'Columns Required' text field to a format that can be passed to create a subset with reuired columns
+      myvector <- c()
+      if(grepl(',',input$n, fixed = TRUE)){
+        mylist <- unlist(strsplit(input$n, split = ","))
+        comma_count <- length(mylist)
+        for (i in 1:comma_count){
+          if (grepl(':',mylist[[i]][1], fixed = TRUE)){
+            mycolonlist <- unlist(strsplit(mylist[[i]][1], split = ":"))
+            for (j in as.numeric(mycolonlist[[1]][1]):as.numeric(mycolonlist[[2]][1])){
+              myvector=append(myvector,j)
+            }
+          } else{
+            myvector=append(myvector,as.numeric(mylist[[i]][1]))
+          }
+        }
+      }else if(grepl(':',input$n, fixed = TRUE)){
+        mycolonlist <- unlist(strsplit(input$n, split = ":"))
+        for (j in as.numeric(mycolonlist[[1]][1]):as.numeric(mycolonlist[[2]][1])){
+          myvector=append(myvector,j)
+        }
+      }else if (input$n != "all") {
+        myvector=append(myvector,as.numeric(input$n))
+      } else {
+        for (k in 1:ncol(final_data)){
+          myvector=append(myvector,k)
+        }
+      }
+      myvector
+      final_data  <- final_data[,myvector,drop=FALSE]
+      
+      char_cols = c()
+      for (l in 1:ncol(final_data)) {
+        if (is.character(final_data[,l])) {
+          if(grepl("name",tolower(colnames(final_data[l]))) | grepl("url",tolower(colnames(final_data[l]))) | grepl("date",tolower(colnames(final_data[l]))) | grepl("version",tolower(colnames(final_data[l])))) {
+            char_cols=char_cols
+          }else {
+            char_cols=append(char_cols,l)
+          }
+        }
+      }
+      #char_cols
+      
+      for (h in 1:length(char_cols)) {
+        #column <- colnames(uber_data[char_cols[1]])
+      #Data cleansing based on options selected
+      #To remove Whitespace, non-ASCII and special characters
+      if (("Yes" %in% input$special)) {
+        require(stringr)
+        step1 <- gsub("[\x80-\xff]", "", final_data[,char_cols[h]])
+        step2 <- gsub("<U\\+\\w+>", "", step1)
+        step3 <- str_replace_all(step2, "!?", "") 
+        final_data[,char_cols[h]] <- stringr::str_replace_all(step3,"[\\s]+", " ") 
+      }
+      #To convert to lower case
+      if ("Yes" %in% input$lower){
+        require(stringr)
+        final_data[,char_cols[h]] <- tolower(enc2utf8(final_data[,char_cols[h]]))	  
+      }
+      #To translate non-english to english
+      if ("Yes" %in% input$english){
+        require(stringr)
+        require(textcat)
+        require(aws.translate)
+        record_count <- nrow(final_data)
+        final_data['language'] <- NA
+        for(i in 1:record_count){
+          final_data$language[i] <- textcat(final_data[,char_cols[h]][i])
+          if (is.na(final_data$language[i])) {
+            final_data[,char_cols[h]][i] <- NA
+            final_data$language[i] <- "none"
+          }
+        }
+        
+        # Translate non-English text to English using AWS Translate API
+        # Read CSV file with AWS access key id and AWS secret access key:
+        keyTable <- read.csv("/Users/anjana/Desktop/AMPBA/Term2/TA/Group-Assignment/credentials.csv", header = T)
+        AWS_ACCESS_KEY_ID <- as.character(keyTable$Access.Key.Id)
+        AWS_SECRET_ACCESS_KEY <- as.character(keyTable$Secret.Access.Key)
+        
+        # Activate system environment:
+        Sys.setenv("AWS_ACCESS_KEY_ID" = AWS_ACCESS_KEY_ID, "AWS_SECRET_ACCESS_KEY" = AWS_SECRET_ACCESS_KEY, "AWS_DEFAULT_REGION" = "us-west-1")
+        
+        for(i in 1:record_count) {
+          if (final_data$language[i] == "spanish" | final_data$language[i] == "portuguese") {
+            final_data[,char_cols[h]][i] <- translate(final_data[,char_cols[h]][i], from = "es", to = "en")[1]
+            final_data$language[i] <- textcat(final_data[,char_cols[h]][i])
+          }
+        }
+        
+        final_data <- subset (final_data, select = -language)
+        final_data <- subset(final_data, !is.na(final_data[,char_cols[h]]))
+      }
+    }
+    return(final_data)
+  })
+  output$download <- downloadHandler(
+    filename = function() {
+      paste0("cleased_uber_data.csv")
+    },
+    content = function(file) {
+      write.csv(datasetInput(), file)
+    }
+  )
+})
+
+
+shinyApp(ui = ui, server = server)
+```
